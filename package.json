@@ -1,6 +1,6 @@
 {
-  "name": "prettier",
-  "version": "1.18.2",
+  "name": "yet-another-prettier",
+  "version": "2.0.0",
   "description": "Prettier is an opinionated code formatter",
   "bin": {
     "prettier": "./bin/prettier.js"
