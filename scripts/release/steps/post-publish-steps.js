@@ -1,10 +1,9 @@
-"use strict";
+import chalk from "chalk";
+import outdent from "outdent";
+import execa from "execa";
+import { fetchText, logPromise } from "../utils.js";
 
-const chalk = require("chalk");
-const dedent = require("dedent");
-const fetch = require("node-fetch");
-const execa = require("execa");
-const { logPromise } = require("../utils");
+const outdentString = outdent.string;
 
 const SCHEMA_REPO = "SchemaStore/schemastore";
 const SCHEMA_PATH = "src/schemas/json/prettierrc.json";
@@ -14,29 +13,29 @@ const EDIT_URL = `https://github.com/${SCHEMA_REPO}/edit/master/${SCHEMA_PATH}`;
 // Any optional or manual step can be warned in this script.
 
 async function checkSchema() {
-  const schema = await execa.stdout("node", ["scripts/generate-schema.js"]);
+  const { stdout: schema } = await execa("node", [
+    "scripts/generate-schema.mjs",
+  ]);
   const remoteSchema = await logPromise(
     "Checking current schema in SchemaStore",
-    fetch(RAW_URL)
-      .then(r => r.text())
-      .then(t => t.trim())
+    fetchText(RAW_URL)
   );
 
-  if (schema === remoteSchema) {
+  if (schema === remoteSchema.trim()) {
     return;
   }
 
-  return dedent(chalk`
+  return outdentString(chalk`
     {bold.underline The schema in {yellow SchemaStore} needs an update.}
     - Open {cyan.underline ${EDIT_URL}}
-    - Run {yellow node scripts/generate-schema.js} and copy the new schema
+    - Run {yellow node scripts/generate-schema.mjs} and copy the new schema
     - Paste it on GitHub interface
     - Open a PR
   `);
 }
 
 function twitterAnnouncement() {
-  return dedent(chalk`
+  return outdentString(chalk`
     {bold.underline Announce on Twitter}
     - Open {cyan.underline https://tweetdeck.twitter.com}
     - Make sure you are tweeting from the {yellow @PrettierCode} account.
@@ -44,7 +43,7 @@ function twitterAnnouncement() {
   `);
 }
 
-module.exports = async function() {
+export default async function () {
   const steps = [await checkSchema(), twitterAnnouncement()].filter(Boolean);
 
   console.log(chalk.bold.green("The script has finished!\n"));
@@ -54,7 +53,7 @@ module.exports = async function() {
   }
 
   console.log(
-    dedent(chalk`
+    outdentString(chalk`
       {yellow.bold The following ${
         steps.length === 1 ? "step is" : "steps are"
       } optional.}
@@ -62,4 +61,4 @@ module.exports = async function() {
       ${steps.join("\n\n")}
     `)
   );
-};
+}

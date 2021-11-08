@@ -1,9 +1,7 @@
-"use strict";
+import { runYarn, logPromise } from "../utils.js";
 
-const { runYarn, logPromise } = require("../utils");
-
-module.exports = async function() {
-  await logPromise("Running linter", runYarn("lint"));
-  await logPromise("Running linter on docs", runYarn("lint-docs"));
+export default async function () {
+  await logPromise("Running linter", runYarn("lint:eslint"));
+  await logPromise("Running Prettier on docs", runYarn("lint:prettier"));
   await logPromise("Running tests", runYarn("test"));
-};
+}

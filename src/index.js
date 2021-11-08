@@ -1,33 +1,34 @@
 "use strict";
 
-const version = require("../package.json").version;
+const { version } = require("../package.json");
 
-const core = require("./main/core");
-const getSupportInfo = require("./main/support").getSupportInfo;
-const getFileInfo = require("./common/get-file-info");
-const sharedUtil = require("./common/util-shared");
-const loadPlugins = require("./common/load-plugins");
+const core = require("./main/core.js");
+const { getSupportInfo } = require("./main/support.js");
+const getFileInfo = require("./common/get-file-info.js");
+const sharedUtil = require("./common/util-shared.js");
+const plugins = require("./common/load-plugins.js");
+const config = require("./config/resolve-config.js");
+const doc = require("./document/index.js");
 
-const config = require("./config/resolve-config");
-
-const doc = require("./doc");
-
-// Luckily `opts` is always the 2nd argument
-function _withPlugins(fn) {
-  return function() {
-    const args = Array.from(arguments);
-    const opts = args[1] || {};
-    args[1] = Object.assign({}, opts, {
-      plugins: loadPlugins(opts.plugins, opts.pluginSearchDirs)
-    });
-    return fn.apply(null, args);
+function _withPlugins(
+  fn,
+  optsArgIdx = 1 // Usually `opts` is the 2nd argument
+) {
+  return (...args) => {
+    const opts = args[optsArgIdx] || {};
+    args[optsArgIdx] = {
+      ...opts,
+      plugins: plugins.loadPlugins(opts.plugins, opts.pluginSearchDirs),
+    };
+    return fn(...args);
   };
 }
 
-function withPlugins(fn) {
-  const resultingFn = _withPlugins(fn);
+function withPlugins(fn, optsArgIdx) {
+  const resultingFn = _withPlugins(fn, optsArgIdx);
   if (fn.sync) {
-    resultingFn.sync = _withPlugins(fn.sync);
+    // @ts-expect-error
+    resultingFn.sync = _withPlugins(fn.sync, optsArgIdx);
   }
   return resultingFn;
 }
@@ -41,8 +42,8 @@ module.exports = {
     return formatWithCursor(text, opts).formatted;
   },
 
-  check: function(text, opts) {
-    const formatted = formatWithCursor(text, opts).formatted;
+  check(text, opts) {
+    const { formatted } = formatWithCursor(text, opts);
     return formatted === text;
   },
 
@@ -50,14 +51,31 @@ module.exports = {
 
   resolveConfig: config.resolveConfig,
   resolveConfigFile: config.resolveConfigFile,
-  clearConfigCache: config.clearCache,
+  clearConfigCache() {
+    config.clearCache();
+    plugins.clearCache();
+  },
 
+  /** @type {typeof getFileInfo} */
   getFileInfo: withPlugins(getFileInfo),
-  getSupportInfo: withPlugins(getSupportInfo),
+  /** @type {typeof getSupportInfo} */
+  getSupportInfo: withPlugins(getSupportInfo, 0),
 
   version,
 
   util: sharedUtil,
+
+  // Internal shared
+  __internal: {
+    errors: require("./common/errors.js"),
+    coreOptions: require("./main/core-options.js"),
+    createIgnorer: require("./common/create-ignorer.js"),
+    optionsModule: require("./main/options.js"),
+    optionsNormalizer: require("./main/options-normalizer.js"),
+    utils: {
+      arrayify: require("./utils/arrayify.js"),
+    },
+  },
 
   /* istanbul ignore next */
   __debug: {
@@ -65,6 +83,6 @@ module.exports = {
     formatAST: withPlugins(core.formatAST),
     formatDoc: withPlugins(core.formatDoc),
     printToDoc: withPlugins(core.printToDoc),
-    printDocToString: withPlugins(core.printDocToString)
-  }
+    printDocToString: withPlugins(core.printDocToString),
+  },
 };

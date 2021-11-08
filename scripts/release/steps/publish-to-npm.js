@@ -1,25 +1,41 @@
-"use strict";
+import chalk from "chalk";
+import outdent from "outdent";
+import execa from "execa";
+import { logPromise, waitForEnter } from "../utils.js";
 
-const chalk = require("chalk");
-const dedent = require("dedent");
-const execa = require("execa");
-const { logPromise, waitForEnter } = require("../utils");
+const outdentString = outdent.string;
 
-module.exports = async function({ dry, version }) {
+/**
+ * Retry "npm publish" when to enter OTP is failed.
+ */
+async function retryNpmPublish() {
+  const runNpmPublish = () =>
+    execa("npm", ["publish"], {
+      cwd: "./dist",
+      stdio: "inherit", // we need to input OTP if 2FA enabled
+    });
+  for (let i = 5; i > 0; i--) {
+    try {
+      return await runNpmPublish();
+    } catch (error) {
+      if (error.code === "EOTP" && i > 0) {
+        console.log(`To enter OTP is failed, you can retry it ${i} times.`);
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+export default async function ({ dry, version }) {
   if (dry) {
     return;
   }
 
-  await logPromise(
-    "Publishing to npm",
-    execa("npm", ["publish"], {
-      cwd: "./dist",
-      stdio: "inherit" // we need to input OTP if 2FA enabled
-    })
-  );
+  await logPromise("Publishing to npm", retryNpmPublish());
 
   console.log(
-    dedent(chalk`
+    outdentString(chalk`
       {green.bold Prettier ${version} published!}
 
       {yellow.bold Some manual steps are necessary.}
@@ -29,13 +45,13 @@ module.exports = async function({ dry, version }) {
       - Copy release notes from {yellow CHANGELOG.md}
       - Press {bgGreen.black  Publish release }
 
-      {bold.underline Test the new releae}
+      {bold.underline Test the new release}
       - In a new session, run {yellow npm i prettier@latest} in another directory
       - Test the API and CLI
 
       After that, we can proceed to bump this repo's Prettier dependency.
-      Press any key to continue.
+      Press ENTER to continue.
     `)
   );
   await waitForEnter();
-};
+}
